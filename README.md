@@ -7,6 +7,9 @@ maintenance hemodialysis (MHD) patients, with a per-patient SHAP force plot.
 - **Predictors**: Hospitalizations in the past year, Dialysis vintage, CRP, TIBC, Total cholesterol
 - **Cutoff**: optimal threshold by Youden index on the training set
 
+The app loads pre-trained artifacts (`data/model_rf.pkl`, `data/explainer.pkl`)
+for fast startup. To re-train from scratch, run `python train_model.py`.
+
 ## Run locally
 
 ```bash

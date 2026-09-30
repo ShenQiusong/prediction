@@ -7,14 +7,13 @@ Run:  streamlit run app.py
 """
 from pathlib import Path
 
+import joblib
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import shap
 import streamlit as st
 import streamlit.components.v1 as components
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import roc_auc_score, roc_curve
 
 BASE = Path(__file__).resolve().parent
 DATA = BASE / "data"
@@ -35,47 +34,15 @@ st.set_page_config(
 
 
 # ---------------------------------------------------------------- model
-@st.cache_data
-def load_data():
-    df = pd.read_csv(DATA / "clean_data.csv")
-    split = pd.read_csv(DATA / "split_index.csv").sort_values("row_index")
-    df = df.copy()
-    df["Set"] = split["Set"].to_numpy()
-    return df
-
-
 @st.cache_resource
-def train_rf():
-    """Re-train the best model (RF) in Python, mirroring the R setup:
-    mtry = 2  -> max_features = 2
-    nodesize = 10 -> min_samples_leaf = 10
-    Same 7:3 stratified split (split_index.csv), same 5 predictors.
+def load_model():
+    """Load the pre-trained RF model, cutoff and SHAP explainer.
+    Artifacts are produced offline by train_model.py (mtry = 2, nodesize = 10,
+    same 7:3 stratified split, same 5 predictors).
     """
-    df = load_data()
-    train = df[df["Set"] == "Training"]
-
-    Xtr, ytr = train[PREDICTORS], train["Malnutrition"].astype(int)
-
-    rf = RandomForestClassifier(
-        n_estimators=500,
-        max_features=2,
-        min_samples_leaf=10,
-        random_state=20260927,
-        n_jobs=-1,
-    )
-    rf.fit(Xtr, ytr)
-
-    # Optimal cutoff: Youden index on the training set
-    ptr = rf.predict_proba(Xtr)[:, 1]
-    fpr, tpr, thr = roc_curve(ytr, ptr)
-    cutoff = float(thr[np.argmax(tpr - fpr)])
-
-    return rf, cutoff
-
-
-@st.cache_resource
-def get_explainer(_rf):
-    return shap.Explainer(_rf)
+    bundle = joblib.load(DATA / "model_rf.pkl")
+    explainer = joblib.load(DATA / "explainer.pkl")
+    return bundle["model"], bundle["cutoff"], explainer
 
 
 # ---------------------------------------------------------------- plots
@@ -124,8 +91,7 @@ st.caption(
     "hemodialysis patients. Enter patient characteristics below."
 )
 
-rf, cutoff = train_rf()
-explainer = get_explainer(rf)
+rf, cutoff, explainer = load_model()
 
 st.subheader("Patient inputs")
 col1, col2 = st.columns(2)
